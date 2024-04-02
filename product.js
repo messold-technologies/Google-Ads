@@ -53,6 +53,7 @@ function processConversions(adGroup, campaignTypeName, fromDate, toDate, campaig
       "AND Conversions > 0 " +
       "DURING " + fromDate + "," + toDate);
   } else {
+    // This branch is not relevant to Shopping campaigns but included for completeness.
     report = AdsApp.report("SELECT Query, Cost, Conversions, Clicks " +
       "FROM SEARCH_QUERY_PERFORMANCE_REPORT " +
       "WHERE AdGroupId = " + adGroup.getId() + " " +
@@ -86,6 +87,9 @@ function evaluateItemsToHighlight(adGroup, totalSpend, totalConversions, totalCl
   Logger.log("Campaign: " + campaignName + ", Ad Group: " + adGroup.getName() + ", Average Cost Per Conversion: " + averageCostPerConversion.toFixed(2));
   Logger.log("Campaign: " + campaignName + ", Ad Group: " + adGroup.getName() + ", Average Clicks Per Conversion: " + averageClicksPerConversion.toFixed(2));
 
+  // Retrieve already excluded item IDs to filter them out in advance
+  var excludedItemIds = getExcludedItemIds(adGroup);
+  
   var itemsToHighlight = [];
 
   var report = AdsApp.report("SELECT OfferId, Cost, Conversions, Clicks " +
@@ -97,16 +101,18 @@ function evaluateItemsToHighlight(adGroup, totalSpend, totalConversions, totalCl
   var rows = report.rows();
   while (rows.hasNext()) {
     var row = rows.next();
-    var cost = parseFloat(row['Cost'].replace(/,/g, ''));
-    var clicks = parseInt(row['Clicks']);
-    if (cost > averageCostPerConversion || clicks > averageClicksPerConversion) {
-      itemsToHighlight.push(row['OfferId']);
+    var offerId = row['OfferId'];
+    // Exclude already excluded items from being considered.
+    if (!excludedItemIds.includes(offerId)) {
+      var cost = parseFloat(row['Cost'].replace(/,/g, ''));
+      var clicks = parseInt(row['Clicks']);
+      if (cost > averageCostPerConversion || clicks > averageClicksPerConversion) {
+        itemsToHighlight.push(offerId);
+      }
     }
   }
 
-  return itemsToHighlight.filter(function(itemId) {
-    return !getExcludedItemIds(adGroup).includes(itemId);
-  });
+  return itemsToHighlight;
 }
 
 function logHighlightedItems(campaignName, adGroup, itemsToHighlight) {
